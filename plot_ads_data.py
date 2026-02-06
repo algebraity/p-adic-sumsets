@@ -6,7 +6,7 @@ from scipy.optimize import curve_fit
 from pathlib import Path
 
 # Get available CSV files
-data_dir = Path("data/every_25")
+data_dir = Path("data")
 csv_files = sorted([f.name for f in data_dir.glob("*.csv")])
 if not csv_files:
     print("No CSV files found in data/ directory")
@@ -37,8 +37,8 @@ y_vals = [0.5 - d for d in delta_vals]
 
 # Omit first 5 values (outliers)
 # (keep slicing as-is; adjust index if needed)
-n_vals = n_vals
-y_vals = y_vals
+n_vals = n_vals[5:]
+y_vals = y_vals[5:]
 
 # Ensure numpy arrays for fitting
 n_arr = np.array(n_vals, dtype=float)
