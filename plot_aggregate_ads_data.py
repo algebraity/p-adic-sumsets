@@ -16,12 +16,22 @@ if not csv_files:
     print(f"No CSV files found in {data_dir} directory")
     exit(1)
 
+# Sort files by p value (numerically) extracted from filename
+def extract_p_value(filepath):
+    parts = filepath.stem.split('_')
+    try:
+        return int(parts[1])
+    except (IndexError, ValueError):
+        return float('inf')
+
+csv_files.sort(key=extract_p_value)
+
 print(f"Found {len(csv_files)} CSV files in {data_dir}/")
 
-# Define the model: y = 0.5 - C * n^(-a)
-def model(n, C, a):
+# Define the model: y = 1/2 - log_p(n)/n + C/n
+def model(n, p_val, C):
     n = np.array(n, dtype=float)
-    return 0.5 - C * n ** (-a)
+    return 0.5 - np.log(n) / (n * np.log(p_val)) + C / n
 
 # Create plot
 plt.figure(figsize=(14, 8))
@@ -33,9 +43,9 @@ for csv_file in csv_files:
     # Extract p value from filename (e.g., "ads_2_500_every_5" -> p=2)
     filename_parts = csv_file.stem.split('_')
     try:
-        p_val = filename_parts[1]  # Format: ads_p_n_every_5
+        p_val = int(filename_parts[1])  # Format: ads_p_n_every_5
     except:
-        p_val = csv_file.stem
+        p_val = 2  # Default to 2 if parsing fails
     
     # Read CSV data
     n_vals = []
@@ -51,8 +61,8 @@ for csv_file in csv_files:
     y_vals = [0.5 - d for d in delta_vals]
     
     # Omit first 5 values (outliers)
-    n_vals = n_vals[50:]
-    y_vals = y_vals[50:]
+    n_vals = n_vals
+    y_vals = y_vals
     
     if not n_vals:
         print(f"  Skipping {csv_file.name} - insufficient data after filtering")
@@ -64,27 +74,31 @@ for csv_file in csv_files:
     
     # Fit the curve using curve_fit
     try:
-        popt, _ = curve_fit(model, n_arr, y_arr, p0=[1.0, 0.5], maxfev=10000)
-        C_fit, a_fit = popt
-        fit_y = model(n_arr, C_fit, a_fit)
+        # Create a wrapper function with fixed p_val
+        def model_wrapper(n, C):
+            return model(n, p_val, C)
+        
+        popt, _ = curve_fit(model_wrapper, n_arr, y_arr, p0=[1.0], maxfev=10000)
+        C_fit = popt[0]
+        fit_y = model(n_arr, p_val, C_fit)
         
         # Calculate R²
         ss_res = np.sum((y_arr - fit_y) ** 2)
         ss_tot = np.sum((y_arr - np.mean(y_arr)) ** 2)
         r2 = 1 - (ss_res / ss_tot) if ss_tot != 0 else float('nan')
         
-        fit_label = f'p={p_val}: y = 0.5 - {C_fit:.6f}·n^(-{a_fit:.6f}), R² = {r2:.6f}'
+        fit_label = f'p={p_val}: y = 1/2 - log_p(n)/n + {C_fit:.6f}/n, R² = {r2:.6f}'
         
         # Plot best-fit curve
         plt.plot(n_arr, fit_y, linewidth=2.5, label=fit_label, marker='o', markersize=5, alpha=0.7)
         
-        print(f"  Fitted: C={C_fit:.6f}, a={a_fit:.6f}, R²={r2:.6f}")
+        print(f"  Fitted: C={C_fit:.6f}, R²={r2:.6f}")
     except Exception as e:
         print(f"  Fitting error for {csv_file.name}: {e}")
 
 plt.xlabel('n', fontsize=12)
 plt.ylabel('0.5 - delta', fontsize=12)
-plt.title('Best-fit curves for different p values (every_5 dataset)', fontsize=14)
+plt.title('Best-fit curves for different p', fontsize=14)
 plt.axhline(y=0.5, color='green', linestyle='--', linewidth=2, label='y = 1/2', alpha=0.5)
 plt.legend(loc='best', fontsize=10)
 plt.grid(True, alpha=0.3)
