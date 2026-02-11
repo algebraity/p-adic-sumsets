@@ -1,4 +1,5 @@
 import subprocess
+from ookami import *
 
 def ads_algorithm(n, p):
         result = subprocess.run(
@@ -20,10 +21,9 @@ def main(n, p, i):
     for n in range(1+i, 201, i):
         A1, AA1 = ads_algorithm(n, p)
 
-        s = set([i * (p**j) for i in range(1, n+1) for j in range(1, n+1)])
-        ads = set([x + y for x in s for y in s])
-        A2 = len(s)
-        AA2 = len(ads)
+        S = CombSet([i * (p**j) for i in range(1, n+1) for j in range(1, n+1)])
+        A2 = S.cardinality
+        AA2 = S.ads.cardinality
 
         if A1 == A2 and AA1 == AA2:
             print(f"All good for {n} :3    |    {A1}, {AA1}")
